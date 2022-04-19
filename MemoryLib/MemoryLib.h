@@ -35,7 +35,7 @@ class CMemory : public CPatternScan, public CHook
 {
 private:
     uintptr_t procID = NULL;
-    HANDLE hHandle = NULL;
+    HANDLE hProcess = NULL;
 
     ~CMemory();
 public:

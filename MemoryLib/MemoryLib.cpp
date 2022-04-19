@@ -236,7 +236,7 @@ uintptr_t CMemory::GetProcessID(const char* szProcessName)
                 if (!_strcmpi(szProcessName, (const char*)pe32.szExeFile))
                 {
                     procID = pe32.th32ProcessID;
-                    hHandle = OpenProcess(PROCESS_ALL_ACCESS, false, procID);
+                    hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, procID);
                     break;
                 }
 
@@ -254,14 +254,14 @@ template <typename value>
 uintptr_t CMemory::ReadMem(uintptr_t addy)
 {
     value val{};
-    ReadProcessMemory(hHandle, addy, &val, sizeof(val), NULL);
+    ReadProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
     return val;
 }
 
 template <typename value>
 void CMemory::WriteMem(uintptr_t addy, value val)
 {
-    WriteProcessMemory(hHandle, addy, &val, sizeof(val), NULL);
+    WriteProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
 }
 
 void CMemory::InNop(LPVOID dst, size_t iSize)
@@ -282,11 +282,18 @@ void CMemory::InPatch(LPVOID dst, LPVOID src, size_t iSize)
 
 void CMemory::ExPatch(LPVOID dst, LPVOID src, size_t iSize)
 {
-    WriteProcessMemory(hHandle, dst, src, sizeof(dst), NULL);
+    DWORD oldProtect;
+    VirtualProtectEx(hProcess, dst, iSize, PAGE_EXECUTE_READWRITE, &oldProtect);
+    WriteProcessMemory(hProcess, dst, src, sizeof(dst), NULL);
+    VirtualProtectEx(hProcess, dst, iSize, oldProtect, NULL);
 }
 
 void CMemory::ExNop(LPVOID dst, size_t iSize)
 {
-    LPVOID pSrc = (LPVOID)0x90;
-    WriteProcessMemory(hHandle, dst, &pSrc, sizeof(dst), NULL);
+    BYTE* nopArray = new BYTE[];
+    memset(nopArray, 0x90, iSize);
+
+    ExPatch(dst, nopArray, iSize);
+
+    delete[] nopArray;
 }
