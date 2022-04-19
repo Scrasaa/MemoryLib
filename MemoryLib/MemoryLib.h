@@ -15,7 +15,7 @@ public:
 class CPatternScan
 {
 private:
-    char* ScanWrapper(char* pattern, char* mask, char* begin, size_t size);
+    char* ScanInWrapper(char* pattern, char* mask, char* begin, size_t size);
 
     void Parse(char* combo, char* pattern, char* mask);
 
@@ -27,9 +27,11 @@ private:
 
     LDR_DATA_TABLE_ENTRY* GetLDREntry(std::string name);
 
+    char* ScanExWrapper(char* pattern, char* mask, char* begin, char* end, HANDLE hProc);
+
 public:
-    intptr_t PatternScanInternal(char* combopattern, std::string modName);
-    char* PatternScanExternal(char* pattern, char* mask, char* begin, char* end, HANDLE hProc);
+    intptr_t InPatternScan(char* combopattern, std::string szModName);
+    intptr_t ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess);
 };
 
 class CMemory : public CPatternScan, public CHook
@@ -54,5 +56,7 @@ public:
     void ExNop(LPVOID dst, size_t iSize, HANDLE hProcess);
 
     HANDLE GetProcess(uintptr_t procID);
+
+    MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
 
 };

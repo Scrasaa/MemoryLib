@@ -51,7 +51,7 @@ bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLengt
     return false;
 }
 
-char* CPatternScan::ScanWrapper(char* pattern, char* mask, char* begin, size_t size)
+char* CPatternScan::ScanInWrapper(char* pattern, char* mask, char* begin, size_t size)
 {
     char* match{ nullptr };
 
@@ -73,7 +73,7 @@ char* CPatternScan::ScanWrapper(char* pattern, char* mask, char* begin, size_t s
     return match;
 }
 
-char* CPatternScan::PatternScanExternal(char* pattern, char* mask, char* begin, char* end, HANDLE hProc)
+char* CPatternScan::ScanExWrapper(char* pattern, char* mask, char* begin, char* end, HANDLE hProcess)
 {
     char* match = nullptr;
     SIZE_T bytesRead;
@@ -85,17 +85,17 @@ char* CPatternScan::PatternScanExternal(char* pattern, char* mask, char* begin, 
 
     for (char* curr = begin; curr < end; curr += mbi.RegionSize)
     {
-        if (!VirtualQueryEx(hProc, curr, &mbi, sizeof(mbi))) return nullptr;
+        if (!VirtualQueryEx(hProcess, curr, &mbi, sizeof(mbi))) return nullptr;
         if (mbi.State != MEM_COMMIT || mbi.Protect == PAGE_NOACCESS) continue;
 
         // char* of the memory region
         buffer = new char[mbi.RegionSize];
 
-        if (VirtualProtectEx(hProc, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &oldprotect))
+        if (VirtualProtectEx(hProcess, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &oldprotect))
         {
             // Reads the current memory region
-            ReadProcessMemory(hProc, mbi.BaseAddress, buffer, mbi.RegionSize, &bytesRead);
-            VirtualProtectEx(hProc, mbi.BaseAddress, mbi.RegionSize, oldprotect, &oldprotect);
+            ReadProcessMemory(hProcess, mbi.BaseAddress, buffer, mbi.RegionSize, &bytesRead);
+            VirtualProtectEx(hProcess, mbi.BaseAddress, mbi.RegionSize, oldprotect, &oldprotect);
 
             char* internalAddr = PatternScan(pattern, mask, buffer, (unsigned int)bytesRead);
 
@@ -109,6 +109,24 @@ char* CPatternScan::PatternScanExternal(char* pattern, char* mask, char* begin, 
     }
     delete[] buffer;
     return (char*)match;
+}
+
+intptr_t CPatternScan::ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess)
+{
+    char pattern[100];
+    char mask[100];
+    Parse(combopattern, pattern, mask);
+
+    CMemory pMemory{};
+
+    MODULEENTRY32 modEntry = pMemory.GetModuleEntry(szModName.c_str(), procID);
+
+    char* begin = (char*)modEntry.modBaseAddr;
+    char* end = begin + modEntry.modBaseSize;
+
+    char* match = ScanExWrapper(pattern, mask, begin, end, hProcess);
+
+    return (intptr_t)match;
 }
 
 void CPatternScan::Parse(char* combo, char* pattern, char* mask)
@@ -197,7 +215,7 @@ LDR_DATA_TABLE_ENTRY* CPatternScan::GetLDREntry(std::string name)
     // Buffer of the linked list head
     LIST_ENTRY curr = head;
 
-     // While begin != end, linked list (goes forward until last list is reached) -> just interates trhough MemoryOrderModuleList
+    // While begin != end, linked list (goes forward until last list is reached) -> just interates trhough MemoryOrderModuleList
     while (curr.Flink != head.Blink)
     {
         // Base Adress of the module struc
@@ -222,16 +240,16 @@ LDR_DATA_TABLE_ENTRY* CPatternScan::GetLDREntry(std::string name)
     return ldr;
 }
 
-intptr_t CPatternScan::PatternScanInternal(char* combopattern, std::string modName)
+intptr_t CPatternScan::InPatternScan(char* combopattern, std::string szModName)
 {
     // Getting the struc module informations of our module
-    LDR_DATA_TABLE_ENTRY* ldr = GetLDREntry(modName);
+    LDR_DATA_TABLE_ENTRY* ldr = GetLDREntry(szModName);
 
     char pattern[100];
     char mask[100];
     Parse(combopattern, pattern, mask);
 
-    char* match = ScanWrapper(pattern, mask, (char*)ldr->DllBase, ldr->SizeOfImage);
+    char* match = ScanInWrapper(pattern, mask, (char*)ldr->DllBase, ldr->SizeOfImage);
 
     return (intptr_t)match;
 }
@@ -265,6 +283,34 @@ uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName, uintptr_t proc
         CloseHandle(hSnap);
 
     return moduleBaseAddress;
+}
+
+MODULEENTRY32 CMemory::GetModuleEntry(const char* szModuleName, uintptr_t procID)
+{
+    MODULEENTRY32 mod32{ 0 };
+    HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE32 | TH32CS_SNAPMODULE, procID);
+
+    if (hSnap != INVALID_HANDLE_VALUE)
+    {
+        mod32.dwSize = sizeof(mod32);
+
+        if (Module32First(hSnap, &mod32))
+        {
+            do
+            {
+                if (!_strcmpi((const char*)mod32.szModule, szModuleName))
+                {
+                    break;
+                }
+
+            } while (Module32Next(hSnap, &mod32));
+        }
+    }
+
+    if (hSnap)
+        CloseHandle(hSnap);
+
+    return mod32;
 }
 
 uintptr_t CMemory::GetProcessID(const char* szProcessName)
@@ -302,9 +348,9 @@ uintptr_t CMemory::ReadMem(uintptr_t addy, HANDLE hProcess)
 {
     value val{};
     DWORD oldProtect;
-    VirtualProtectEx(hProcess, dst, iSize, PAGE_EXECUTE_READ, &oldProtect); // If it doesnt work, try out PAGE_EXECUTE_READWRITE
+    VirtualProtectEx(hProcess, (LPVOID)addy, sizeof(addy), PAGE_EXECUTE_READ, &oldProtect); // If it doesnt work, try out PAGE_EXECUTE_READWRITE
     ReadProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
-    VirtualProtectEx(hProcess, dst, iSize, oldProtect, NULL);
+    VirtualProtectEx(hProcess, (LPVOID)addy, sizeof(addy), oldProtect, NULL);
     return val;
 }
 
@@ -312,9 +358,9 @@ template <typename value>
 void CMemory::WriteMem(uintptr_t addy, value val, HANDLE hProcess)
 {
     DWORD oldProtect;
-    VirtualProtectEx(hProcess, dst, iSize, PAGE_EXECUTE_READWRITE, &oldProtect);
+    VirtualProtectEx(hProcess, (LPVOID)addy, sizeof(addy), PAGE_EXECUTE_READWRITE, &oldProtect);
     WriteProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
-    VirtualProtectEx(hProcess, dst, iSize, oldProtect, NULL);
+    VirtualProtectEx(hProcess, (LPVOID)addy, sizeof(addy), oldProtect, NULL);
 }
 
 void CMemory::InNop(LPVOID dst, size_t iSize)
@@ -358,5 +404,5 @@ HANDLE CMemory::GetProcess(uintptr_t procID)
     while (!hProcess)
         hProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, procID);
 
-     return hProcess;
+    return hProcess;
 }
