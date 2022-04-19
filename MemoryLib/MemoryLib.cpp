@@ -55,12 +55,16 @@ char* CPatternScan::ScanWrapper(char* pattern, char* mask, char* begin, size_t s
 {
     char* match{ nullptr };
 
+    // Contains information about a range of pages in the virtual address space of a process. The VirtualQuery and VirtualQueryEx functions use this structure.
     MEMORY_BASIC_INFORMATION mbi{};
 
+    // Iterates through memory regionsW
     for (char* curr = begin; curr < begin + size; curr += mbi.RegionSize)
     {
+        // Checks if the memory regions are accessable and readable, if not we skip
         if (!VirtualQuery(curr, &mbi, sizeof(mbi)) || mbi.State != MEM_COMMIT || mbi.Protect == PAGE_NOACCESS) continue;
 
+        // If we found a valid memory region, we start our scan
         match = PatternScan(pattern, mask, curr, mbi.RegionSize);
 
         if (match != nullptr)
@@ -95,24 +99,26 @@ void CPatternScan::Parse(char* combo, char* pattern, char* mask)
 
 char* CPatternScan::PatternScan(char* pattern, char* mask, char* begin, size_t size)
 {
-    size_t patternLen = strlen(mask);
+    size_t iPatternLength = strlen(mask);
 
+    // Loop through memory region
     for (int i = 0; i < size; i++)
     {
-        bool found = true;
-
-        for (int j = 0; j < patternLen; j++)
+        bool bFound = true;
+        // Loop to check pattern and mask
+        for (int j = 0; j < iPatternLength; j++)
         {
+            // Check if it is not a wildcard and not matching pattern
             if (mask[j] != '?' && pattern[j] != *(char*)((intptr_t)begin + i + j))
             {
-                found = false;
+                bFound = false;
                 break;
             }
         }
-        if (found)
-        {
+
+        if (bFound)
             return begin + i;
-        }
+
     }
     return nullptr;
 }
@@ -122,10 +128,12 @@ char* CPatternScan::TO_CHAR(wchar_t* string)
     size_t len = wcslen(string) + 1;
     char* c_string = new char[len];
     size_t numCharsRead;
+    // Converts a sequence of wide characters to a corresponding sequence of multibyte characters
     wcstombs_s(&numCharsRead, c_string, len, string, _TRUNCATE);
     return c_string;
 }
 
+// Structure with ProcessInformation
 PEB* CPatternScan::GetPEB()
 {
 #ifdef _WIN64
@@ -140,22 +148,29 @@ PEB* CPatternScan::GetPEB()
 
 LDR_DATA_TABLE_ENTRY* CPatternScan::GetLDREntry(std::string name)
 {
+    // Contains information about the loaded modules for the process
     LDR_DATA_TABLE_ENTRY* ldr = nullptr;
 
     PEB* peb = GetPEB();
 
-    LIST_ENTRY head = peb->Ldr->InMemoryOrderModuleList;
+    // Structure for a doubly linked list
+    LIST_ENTRY head = peb->Ldr->InMemoryOrderModuleList; // inMemoryOrderModuleList = head of a doubly linked list that contains loaded moduels in the process!
 
+    // Buffer of the linked list head
     LIST_ENTRY curr = head;
 
+     // While begin != end, linked list (goes forward until last list is reached) -> just interates trhough MemoryOrderModuleList
     while (curr.Flink != head.Blink)
     {
+        // Base Adress of the module struc
         LDR_DATA_TABLE_ENTRY* mod = (LDR_DATA_TABLE_ENTRY*)CONTAINING_RECORD(curr.Flink, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
 
         if (mod->FullDllName.Buffer)
         {
+            // Get module names
             char* cName = TO_CHAR(mod->BaseDllName.Buffer);
 
+            // Comapre moduel names with our input module name
             if (_stricmp(cName, name.c_str()) == 0)
             {
                 ldr = mod;
@@ -163,13 +178,15 @@ LDR_DATA_TABLE_ENTRY* CPatternScan::GetLDREntry(std::string name)
             }
             delete[] cName;
         }
-        curr = *curr.Flink;
+        curr = *curr.Flink; // curr = next list
     }
+    // Returns the structure of the found module
     return ldr;
 }
 
 intptr_t CPatternScan::PatternScanInternal(char* combopattern, std::string modName)
 {
+    // Getting the struc module informations of our module
     LDR_DATA_TABLE_ENTRY* ldr = GetLDREntry(modName);
 
     char pattern[100];
