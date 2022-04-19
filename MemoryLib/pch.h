@@ -11,5 +11,7 @@
 #include "framework.h"
 #include <Windows.h>
 #include <TlHelp32.h>
+#include <string>
+
 
 #endif //PCH_H
