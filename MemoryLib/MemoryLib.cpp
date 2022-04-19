@@ -246,14 +246,20 @@ template <typename value>
 uintptr_t CMemory::ReadMem(uintptr_t addy, HANDLE hProcess)
 {
     value val{};
+    DWORD oldProtect;
+    VirtualProtectEx(hProcess, dst, iSize, PAGE_EXECUTE_READ, &oldProtect); // If it doesnt work, try out PAGE_EXECUTE_READWRITE
     ReadProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
+    VirtualProtectEx(hProcess, dst, iSize, oldProtect, NULL);
     return val;
 }
 
 template <typename value>
 void CMemory::WriteMem(uintptr_t addy, value val, HANDLE hProcess)
 {
+    DWORD oldProtect;
+    VirtualProtectEx(hProcess, dst, iSize, PAGE_EXECUTE_READWRITE, &oldProtect);
     WriteProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
+    VirtualProtectEx(hProcess, dst, iSize, oldProtect, NULL);
 }
 
 void CMemory::InNop(LPVOID dst, size_t iSize)
