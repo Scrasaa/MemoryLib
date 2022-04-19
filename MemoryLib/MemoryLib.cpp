@@ -51,8 +51,6 @@ bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLengt
     return false;
 }
 
-
-
 char* CPatternScan::ScanWrapper(char* pattern, char* mask, char* begin, size_t size)
 {
     char* match{ nullptr };
@@ -170,7 +168,6 @@ LDR_DATA_TABLE_ENTRY* CPatternScan::GetLDREntry(std::string name)
     return ldr;
 }
 
-
 intptr_t CPatternScan::PatternScanInternal(char* combopattern, std::string modName)
 {
     LDR_DATA_TABLE_ENTRY* ldr = GetLDREntry(modName);
@@ -186,10 +183,10 @@ intptr_t CPatternScan::PatternScanInternal(char* combopattern, std::string modNa
 
 CMemory::~CMemory()
 {
-    CloseHandle(hHandle);
+ //   CloseHandle(hHandle);
 }
 
-uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName)
+uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName, uintptr_t procID)
 {
     uintptr_t moduleBaseAddress = NULL;
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE32 | TH32CS_SNAPMODULE, procID);
@@ -222,6 +219,7 @@ uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName)
 
 uintptr_t CMemory::GetProcessID(const char* szProcessName)
 {
+    uintptr_t procID = 0;
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 
     if (hSnap != INVALID_HANDLE_VALUE)
@@ -236,7 +234,6 @@ uintptr_t CMemory::GetProcessID(const char* szProcessName)
                 if (!_strcmpi(szProcessName, (const char*)pe32.szExeFile))
                 {
                     procID = pe32.th32ProcessID;
-                    hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, procID);
                     break;
                 }
 
@@ -251,7 +248,7 @@ uintptr_t CMemory::GetProcessID(const char* szProcessName)
 }
 
 template <typename value>
-uintptr_t CMemory::ReadMem(uintptr_t addy)
+uintptr_t CMemory::ReadMem(uintptr_t addy, HANDLE hProcess)
 {
     value val{};
     ReadProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
@@ -259,7 +256,7 @@ uintptr_t CMemory::ReadMem(uintptr_t addy)
 }
 
 template <typename value>
-void CMemory::WriteMem(uintptr_t addy, value val)
+void CMemory::WriteMem(uintptr_t addy, value val, HANDLE hProcess)
 {
     WriteProcessMemory(hProcess, addy, &val, sizeof(val), NULL);
 }
@@ -280,20 +277,30 @@ void CMemory::InPatch(LPVOID dst, LPVOID src, size_t iSize)
     VirtualProtect(dst, iSize, oldProtect, &oldProtect);
 }
 
-void CMemory::ExPatch(LPVOID dst, LPVOID src, size_t iSize)
+void CMemory::ExPatch(LPVOID dst, LPVOID src, size_t iSize, HANDLE hProcess)
 {
     DWORD oldProtect;
     VirtualProtectEx(hProcess, dst, iSize, PAGE_EXECUTE_READWRITE, &oldProtect);
-    WriteProcessMemory(hProcess, dst, src, sizeof(dst), NULL);
+    WriteProcessMemory(hProcess, dst, src, iSize, NULL);
     VirtualProtectEx(hProcess, dst, iSize, oldProtect, NULL);
 }
 
-void CMemory::ExNop(LPVOID dst, size_t iSize)
+void CMemory::ExNop(LPVOID dst, size_t iSize, HANDLE hProcess)
 {
     BYTE* nopArray = new BYTE[];
     memset(nopArray, 0x90, iSize);
 
-    ExPatch(dst, nopArray, iSize);
+    ExPatch(dst, nopArray, iSize, hProcess);
 
     delete[] nopArray;
+}
+
+HANDLE CMemory::GetProcess(uintptr_t procID)
+{
+    HANDLE hProcess = 0;
+
+    while (!hProcess)
+        hProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, procID);
+
+     return hProcess;
 }

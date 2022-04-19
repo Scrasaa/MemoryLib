@@ -34,27 +34,26 @@ public:
 class CMemory : public CPatternScan, public CHook
 {
 private:
-    uintptr_t procID = NULL;
-    HANDLE hProcess = NULL;
-
     ~CMemory();
 public:
-    uintptr_t GetModuleBaseAddress(const char* szModuleName);
+    uintptr_t GetModuleBaseAddress(const char* szModuleName, uintptr_t procID);
 
     uintptr_t GetProcessID(const char* szProcessName);
 
     template <typename value>
-    uintptr_t ReadMem(uintptr_t addy);
+    uintptr_t ReadMem(uintptr_t addy, HANDLE hProcess);
 
     template <typename value>
-    void WriteMem(uintptr_t addy, value val);
+    void WriteMem(uintptr_t addy, value val, HANDLE hProcess);
 
     void InNop(LPVOID dst, size_t iSize);
 
     void InPatch(LPVOID dst, LPVOID src, size_t iSize);
 
-    void ExPatch(LPVOID dst, LPVOID src, size_t iSize);
+    void ExPatch(LPVOID dst, LPVOID src, size_t iSize, HANDLE hProcess);
 
-    void ExNop(LPVOID dst, size_t iSize);
+    void ExNop(LPVOID dst, size_t iSize, HANDLE hProcess);
+
+    HANDLE GetProcess(uintptr_t procID);
 
 };
