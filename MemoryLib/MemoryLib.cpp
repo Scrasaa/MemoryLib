@@ -181,11 +181,6 @@ intptr_t CPatternScan::PatternScanInternal(char* combopattern, std::string modNa
     return (intptr_t)match;
 }
 
-CMemory::~CMemory()
-{
- //   CloseHandle(hHandle);
-}
-
 uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName, uintptr_t procID)
 {
     uintptr_t moduleBaseAddress = NULL;

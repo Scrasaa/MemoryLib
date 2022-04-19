@@ -33,8 +33,6 @@ public:
 
 class CMemory : public CPatternScan, public CHook
 {
-private:
-    ~CMemory();
 public:
     uintptr_t GetModuleBaseAddress(const char* szModuleName, uintptr_t procID);
 
