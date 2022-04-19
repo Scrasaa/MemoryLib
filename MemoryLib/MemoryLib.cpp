@@ -287,7 +287,7 @@ void CMemory::ExPatch(LPVOID dst, LPVOID src, size_t iSize, HANDLE hProcess)
 
 void CMemory::ExNop(LPVOID dst, size_t iSize, HANDLE hProcess)
 {
-    BYTE* nopArray = new BYTE[];
+    BYTE* nopArray = new BYTE[iSize];
     memset(nopArray, 0x90, iSize);
 
     ExPatch(dst, nopArray, iSize, hProcess);
