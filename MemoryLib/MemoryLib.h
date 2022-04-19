@@ -29,6 +29,7 @@ private:
 
 public:
     intptr_t PatternScanInternal(char* combopattern, std::string modName);
+    char* PatternScanExternal(char* pattern, char* mask, char* begin, char* end, HANDLE hProc);
 };
 
 class CMemory : public CPatternScan, public CHook

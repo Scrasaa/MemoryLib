@@ -73,6 +73,44 @@ char* CPatternScan::ScanWrapper(char* pattern, char* mask, char* begin, size_t s
     return match;
 }
 
+char* CPatternScan::PatternScanExternal(char* pattern, char* mask, char* begin, char* end, HANDLE hProc)
+{
+    char* match = nullptr;
+    SIZE_T bytesRead;
+    DWORD oldprotect;
+    char* buffer = nullptr;
+    MEMORY_BASIC_INFORMATION mbi = { 0 };
+
+    char* curr = begin;
+
+    for (char* curr = begin; curr < end; curr += mbi.RegionSize)
+    {
+        if (!VirtualQueryEx(hProc, curr, &mbi, sizeof(mbi))) return nullptr;
+        if (mbi.State != MEM_COMMIT || mbi.Protect == PAGE_NOACCESS) continue;
+
+        // char* of the memory region
+        buffer = new char[mbi.RegionSize];
+
+        if (VirtualProtectEx(hProc, mbi.BaseAddress, mbi.RegionSize, PAGE_EXECUTE_READWRITE, &oldprotect))
+        {
+            // Reads the current memory region
+            ReadProcessMemory(hProc, mbi.BaseAddress, buffer, mbi.RegionSize, &bytesRead);
+            VirtualProtectEx(hProc, mbi.BaseAddress, mbi.RegionSize, oldprotect, &oldprotect);
+
+            char* internalAddr = PatternScan(pattern, mask, buffer, (unsigned int)bytesRead);
+
+            if (internalAddr != nullptr)
+            {
+                //calculate from internal to external
+                match = curr + (uintptr_t)(internalAddr - buffer);
+                break;
+            }
+        }
+    }
+    delete[] buffer;
+    return (char*)match;
+}
+
 void CPatternScan::Parse(char* combo, char* pattern, char* mask)
 {
     char lastChar = ' ';
