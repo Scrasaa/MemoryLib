@@ -33,7 +33,7 @@ bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLengt
 BYTE* CHook::TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
 {
     if (iLength < 5)
-        return false;
+        return nullptr;
     
     // Allocate gateway
     BYTE* pGateway = (BYTE*)VirtualAlloc(0, iLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
