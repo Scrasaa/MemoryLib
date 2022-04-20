@@ -7,9 +7,9 @@
 class CHook
 {
 private:
-    bool Hook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
-public:
     bool Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
+public:
+    BYTE* TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
 };
 
 class CPatternScan

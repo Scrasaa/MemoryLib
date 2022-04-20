@@ -10,16 +10,16 @@
 
 // Before using external functions from this class, use GetProcessID first, to open the handle to the process!
 
-bool CHook::Hook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
+bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
 {
-    if (iLength > 5)
+    if (iLength < 5)
         return false;
 
-    uintptr_t oldProtect{};
+    DWORD oldProtect{};
 
-    VirtualProtect((LPVOID)pHookStart, iLength, PAGE_READWRITE, (PDWORD)&oldProtect);
+    VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProtect);
 
-    uintptr_t relativeAddress = (pHookStart - pOurFunction) - iLength;
+    uintptr_t relativeAddress = (pOurFunction - pHookStart) - iLength;
 
     *(uintptr_t*)pHookStart = 0xE9; // JMP opcode /0xE9
 
@@ -30,25 +30,30 @@ bool CHook::Hook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
     return true;
 }
 
-bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
+BYTE* CHook::TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
 {
-    if (iLength > 5)
+    if (iLength < 5)
         return false;
+    
+    // Allocate gateway
+    BYTE* pGateway = (BYTE*)VirtualAlloc(0, iLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
-    uintptr_t oldProtect{};
+    // Write Stolen Bytes to gateway
+    memcpy_s(pGateway, iLength, (LPVOID)pHookStart, iLength);
 
-    void* gateway = VirtualAlloc(0, sizeof(pOurFunction), MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    uintptr_t gatewayRelativeAdd = pHookStart - (uintptr_t)pGateway - 5;
 
-    VirtualProtect((LPVOID)pHookStart, iLength, PAGE_READWRITE, (PDWORD)&oldProtect);
+    // JMP instrc at the end of gateway
+    *(pGateway + iLength) = 0xE9;
 
-    memcpy(gateway, (LPVOID)pHookStart, iLength);
+    // Write add of the gateway to the jump
+    *(uintptr_t*)((uintptr_t)pGateway + iLength + 1) = gatewayRelativeAdd;
 
-    VirtualProtect((LPVOID)pHookStart, iLength, oldProtect, 0);
+    // Detour
+    if (!Detour32(pHookStart, pOurFunction, iLength))
+        return nullptr;
 
-    if (Hook32(pHookStart, pOurFunction, iLength))
-        return true;
-
-    return false;
+    return pGateway;
 }
 
 char* CPatternScan::ScanInWrapper(char* pattern, char* mask, char* begin, size_t size)
