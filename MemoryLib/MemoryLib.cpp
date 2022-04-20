@@ -10,6 +10,8 @@
 
 // Before using external functions from this class, use GetProcessID first, to open the handle to the process!
 
+// Before using external functions from this class, use GetProcessID first, to open the handle to the process!
+
 bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
 {
     if (iLength < 5)
@@ -34,7 +36,7 @@ BYTE* CHook::TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iL
 {
     if (iLength < 5)
         return nullptr;
-    
+
     // Allocate gateway
     BYTE* pGateway = (BYTE*)VirtualAlloc(0, iLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
@@ -54,6 +56,23 @@ BYTE* CHook::TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iL
         return nullptr;
 
     return pGateway;
+}
+
+bool CHook::Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength)
+{
+    if (!pOriginalFunctionAddress)
+        return false;
+
+    // Create a copy of the functionPointer
+    void** pBuffer = (void**)pOriginalFunction;
+
+    // Make the function pointer point to the original function address
+    *pBuffer = (void**)pOriginalFunctionAddress;
+
+    // Make the function pointer point to our gateway
+    *pBuffer = (void*)(TrampHook32((uintptr_t)*pBuffer, ourFunction, iLength));
+
+    return true;
 }
 
 char* CPatternScan::ScanInWrapper(char* pattern, char* mask, char* begin, size_t size)

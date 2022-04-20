@@ -8,8 +8,9 @@ class CHook
 {
 private:
     bool Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
-public:
     BYTE* TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
+public:
+    bool Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t pOurFunction, size_t iLength);
 };
 
 class CPatternScan
