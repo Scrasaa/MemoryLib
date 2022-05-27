@@ -21,7 +21,7 @@ bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLengt
 
     VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProtect);
 
-    uintptr_t relativeAddress = (pOurFunction - pHookStart) - iLength;
+    uintptr_t relativeAddress = (pOurFunction - pHookStart) - 5;
 
     *(uintptr_t*)pHookStart = 0xE9; // JMP opcode /0xE9
 
