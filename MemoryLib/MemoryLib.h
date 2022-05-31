@@ -7,10 +7,16 @@
 class CHook
 {
 private:
+    BYTE* storedBytes;
+    size_t m_Length;
+    void* pRestoreAdd;
+private:
     bool Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
     BYTE* TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
 public:
     bool Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t pOurFunction, size_t iLength);
+    bool Unhook32();
+    ~CHook();
 };
 
 class CPatternScan

@@ -69,8 +69,26 @@ bool CHook::Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, 
     // Make the function pointer point to the original function address
     *pBuffer = (void**)pOriginalFunctionAddress;
 
+    CMemory pMemory{};
+
+    BYTE* storedBytes = new BYTE[iLength];
+
+    pRestoreAdd = pOriginalFunctionAddress;
+
+    m_Length = iLength;
+
+    pMemory.InPatch(pOriginalFunctionAddress, storedBytes, iLength);
+
     // Make the function pointer point to our gateway
     *pBuffer = (void*)(TrampHook32((uintptr_t)*pBuffer, ourFunction, iLength));
+
+    return true;
+}
+
+bool CHook::Unhook32()
+{
+    CMemory pMemory{};
+    pMemory.InPatch(pRestoreAdd, storedBytes, m_Length);
 
     return true;
 }
@@ -429,4 +447,9 @@ HANDLE CMemory::GetProcess(uintptr_t procID)
         hProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, procID);
 
     return hProcess;
+}
+
+CHook::~CHook()
+{
+    delete[] storedBytes;
 }
