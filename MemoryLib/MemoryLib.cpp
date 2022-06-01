@@ -10,8 +10,6 @@
 
 // Before using external functions from this class, use GetProcessID first, to open the handle to the process!
 
-// Before using external functions from this class, use GetProcessID first, to open the handle to the process!
-
 bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
 {
     if (iLength < 5)
@@ -69,16 +67,6 @@ bool CHook::Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, 
     // Make the function pointer point to the original function address
     *pBuffer = (void**)pOriginalFunctionAddress;
 
-    CMemory pMemory{};
-
-    BYTE* storedBytes = new BYTE[iLength];
-
-    pRestoreAdd = pOriginalFunctionAddress;
-
-    m_Length = iLength;
-
-    pMemory.InPatch(pOriginalFunctionAddress, storedBytes, iLength);
-
     // Make the function pointer point to our gateway
     *pBuffer = (void*)(TrampHook32((uintptr_t)*pBuffer, ourFunction, iLength));
 
@@ -87,10 +75,17 @@ bool CHook::Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, 
 
 bool CHook::Unhook32()
 {
-    CMemory pMemory{};
-    pMemory.InPatch(pRestoreAdd, storedBytes, m_Length);
+    memcpy(this->m_oFuncAddy, this->m_Bytes, this->m_iLength);
 
     return true;
+}
+
+CHook::CHook(void* pOriginalFunctionAddress, size_t iLength)
+{
+    this->m_oFuncAddy = pOriginalFunctionAddress;
+    this->m_iLength = iLength;
+
+    memcpy(this->m_Bytes, this->m_oFuncAddy, this->m_iLength);
 }
 
 char* CPatternScan::ScanInWrapper(char* pattern, char* mask, char* begin, size_t size)
@@ -408,7 +403,7 @@ void CMemory::WriteMem(uintptr_t addy, value val, HANDLE hProcess)
 void CMemory::InNop(LPVOID dst, size_t iSize)
 {
     DWORD oldProtect;
-    VirtualProtect(dst, iSize, PAGE_READWRITE, &oldProtect);
+    VirtualProtect(dst, iSize, PAGE_EXECUTE_READWRITE, &oldProtect);
     memset(dst, 0x90, iSize);
     VirtualProtect(dst, iSize, oldProtect, &oldProtect);
 }
@@ -416,8 +411,8 @@ void CMemory::InNop(LPVOID dst, size_t iSize)
 void CMemory::InPatch(LPVOID dst, LPVOID src, size_t iSize)
 {
     DWORD oldProtect;
-    VirtualProtect(dst, iSize, PAGE_READWRITE, &oldProtect);
-    memcpy(dst, src, iSize);
+    VirtualProtect(dst, iSize, PAGE_EXECUTE_READWRITE, &oldProtect);
+    memcpy_s(dst, iSize, src, iSize);
     VirtualProtect(dst, iSize, oldProtect, &oldProtect);
 }
 
@@ -447,9 +442,4 @@ HANDLE CMemory::GetProcess(uintptr_t procID)
         hProcess = OpenProcess(PROCESS_ALL_ACCESS, NULL, procID);
 
     return hProcess;
-}
-
-CHook::~CHook()
-{
-    delete[] storedBytes;
 }

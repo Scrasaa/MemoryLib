@@ -4,19 +4,21 @@
 #include "framework.h"
 #include "ntdll.h"
 
+class CMemory;
+
 class CHook
 {
 private:
-    BYTE* storedBytes;
-    size_t m_Length;
-    void* pRestoreAdd;
+    BYTE m_Bytes[10]{};
+    void* m_oFuncAddy = nullptr;
+    size_t m_iLength = 0;
 private:
     bool Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
     BYTE* TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
 public:
-    bool Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t pOurFunction, size_t iLength);
+    bool Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
     bool Unhook32();
-    ~CHook();
+    CHook(void* pOriginalFunctionAddress, size_t iLength);
 };
 
 class CPatternScan
@@ -41,7 +43,7 @@ public:
     intptr_t ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess);
 };
 
-class CMemory : public CPatternScan, public CHook
+class CMemory
 {
 public:
     uintptr_t GetModuleBaseAddress(const char* szModuleName, uintptr_t procID);
