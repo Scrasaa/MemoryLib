@@ -10,11 +10,26 @@
 
 // Before using external functions from this class, use GetProcessID first, to open the handle to the process!
 
-bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
+void* CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
 {
     if (iLength < 5)
-        return false;
+        return nullptr;
 
+    // Allocate gateway
+    BYTE* pGateway = (BYTE*)VirtualAlloc(0, iLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+
+    // Write Stolen Bytes to gatewa<y
+    memcpy_s(pGateway, iLength, (LPVOID)pHookStart, iLength);
+
+    uintptr_t gatewayRelativeAdd = pHookStart - (uintptr_t)pGateway - 5;
+
+    // JMP instrc at the end of gateway
+    *(pGateway + iLength) = 0xE9;
+
+    // Write add of the gateway to the jump
+    *(uintptr_t*)((uintptr_t)pGateway + iLength + 1) = gatewayRelativeAdd;
+
+    // Detour
     DWORD oldProtect{};
 
     VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProtect);
@@ -27,36 +42,50 @@ bool CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLengt
 
     VirtualProtect((LPVOID)pHookStart, iLength, oldProtect, 0);
 
-    return true;
-}
-
-BYTE* CHook::TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
-{
-    if (iLength < 5)
-        return nullptr;
-
-    // Allocate gateway
-    BYTE* pGateway = (BYTE*)VirtualAlloc(0, iLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-
-    // Write Stolen Bytes to gateway
-    memcpy_s(pGateway, iLength, (LPVOID)pHookStart, iLength);
-
-    uintptr_t gatewayRelativeAdd = pHookStart - (uintptr_t)pGateway - 5;
-
-    // JMP instrc at the end of gateway
-    *(pGateway + iLength) = 0xE9;
-
-    // Write add of the gateway to the jump
-    *(uintptr_t*)((uintptr_t)pGateway + iLength + 1) = gatewayRelativeAdd;
-
-    // Detour
-    if (!Detour32(pHookStart, pOurFunction, iLength))
-        return nullptr;
-
     return pGateway;
 }
 
-bool CHook::Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength)
+void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
+{
+    if (iLength < 13)
+        return nullptr;
+
+    uint8_t absJumpInstructions[] =
+    {
+      0x49, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //mov r10, addr
+      0x41, 0xFF, 0xE2 //jmp r10
+    };
+
+    DWORD oldProc{};
+
+    memcpy(&absJumpInstructions[2], &pOurFunction, sizeof(pOurFunction));
+    memcpy(&pHookStart, &absJumpInstructions, sizeof(absJumpInstructions));
+
+    VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProc);
+
+    void* pTrampoline = VirtualAlloc(0, iLength + sizeof(absJumpInstructions), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+
+    DWORD64 retto = (DWORD64)pHookStart + iLength;
+
+    // trampoline
+    memcpy(absJumpInstructions + 6, &retto, 8);
+    memcpy((void*)((DWORD_PTR)pTrampoline), &pHookStart, iLength);
+    memcpy((void*)((DWORD_PTR)pTrampoline + iLength), absJumpInstructions, sizeof(absJumpInstructions));
+
+    // orig
+    memcpy(absJumpInstructions + 6, &pOurFunction, 8);
+    memcpy(&pHookStart, absJumpInstructions, sizeof(absJumpInstructions));
+
+    for (int i = 13; i < iLength; i++)
+    {
+        *(BYTE*)((DWORD_PTR)pHookStart + i) = 0x90;
+    }
+
+    VirtualProtect(&pHookStart, iLength, oldProc, &oldProc);
+    return (void*)((DWORD_PTR)pTrampoline);
+}
+
+bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength)
 {
     if (!pOriginalFunctionAddress)
         return false;
@@ -68,12 +97,16 @@ bool CHook::Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, 
     *pBuffer = (void**)pOriginalFunctionAddress;
 
     // Make the function pointer point to our gateway
-    *pBuffer = (void*)(TrampHook32((uintptr_t)*pBuffer, ourFunction, iLength));
+    #ifdef _WIN64
+        *pBuffer = (void*)(Detour64((uintptr_t)*pBuffer, ourFunction, iLength));
+    #else 
+        *pBuffer = (void*)(Detour32((uintptr_t)*pBuffer, ourFunction, iLength));
+    #endif
 
     return true;
 }
 
-bool CHook::Unhook32()
+bool CHook::Unhook()
 {
     memcpy(this->m_oFuncAddy, this->m_Bytes, this->m_iLength);
 

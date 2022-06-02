@@ -13,11 +13,11 @@ private:
     void* m_oFuncAddy = nullptr;
     size_t m_iLength = 0;
 private:
-    bool Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
-    BYTE* TrampHook32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
+    void* Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
+    void* Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
 public:
-    bool Hook32(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
-    bool Unhook32();
+    bool Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
+    bool Unhook();
     CHook(void* pOriginalFunctionAddress, size_t iLength);
 };
 
