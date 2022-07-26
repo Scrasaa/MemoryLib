@@ -58,7 +58,9 @@ void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
 
     DWORD oldProc{};
 
+    // copy function address into mov r10, address
     memcpy(&absJumpInstructions[2], &pOurFunction, sizeof(pOurFunction));
+    // place our jmp at our hook function
     memcpy(&pHookStart, &absJumpInstructions, sizeof(absJumpInstructions));
 
     VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProc);
@@ -76,6 +78,7 @@ void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
     memcpy(absJumpInstructions + 6, &pOurFunction, 8);
     memcpy(&pHookStart, absJumpInstructions, sizeof(absJumpInstructions));
 
+    // Nop JMP at our Hook Function
     for (int i = 13; i < iLength; i++)
     {
         *(BYTE*)((DWORD_PTR)pHookStart + i) = 0x90;
