@@ -68,6 +68,9 @@ public:
 
     __forceinline uintptr_t GetVirtualFunctionAdd(uintptr_t pVTable, size_t iOffset);
 
+    template< typename Fn >
+    __forceinline Fn GetVirtualFunction(const void* base, size_t iIndex, size_t iOffset);
+
     MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
 
 };

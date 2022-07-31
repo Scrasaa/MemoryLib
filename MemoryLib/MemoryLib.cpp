@@ -484,3 +484,14 @@ __forceinline uintptr_t CMemory::GetVirtualFunctionAdd(uintptr_t pVTable, size_t
 {
     return *(uintptr_t*)(*(uintptr_t*)pVTable + iOffset);
 }
+
+// function pointer (thiscall)
+/*
+typedef void(__thiscall* OrgFunc)(LPVOID)
+return GetVirtualFunction<OrgFunc>(base, index)(Params);
+*/
+template< typename Fn >
+__forceinline Fn CMemory::GetVirtualFunction(const void* base, size_t iIndex, size_t iOffset)
+{
+        return reinterpret_cast<Fn>(*reinterpret_cast<const void***>((size_t)base + offset));
+}
