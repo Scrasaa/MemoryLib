@@ -479,3 +479,8 @@ HANDLE CMemory::GetProcess(uintptr_t procID)
 
     return hProcess;
 }
+
+__forceinline uintptr_t CMemory::GetVirtualFunctionAdd(uintptr_t pVTable, size_t iOffset)
+{
+    return *(uintptr_t*)(*(uintptr_t*)pVTable + iOffset);
+}

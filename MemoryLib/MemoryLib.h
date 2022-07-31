@@ -66,6 +66,8 @@ public:
 
     HANDLE GetProcess(uintptr_t procID);
 
+    __forceinline uintptr_t GetVirtualFunctionAdd(uintptr_t pVTable, size_t iOffset);
+
     MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
 
 };
