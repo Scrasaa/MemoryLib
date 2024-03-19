@@ -4,23 +4,6 @@
 #include "framework.h"
 #include "ntdll.h"
 
-class CMemory;
-
-class CHook
-{
-private:
-    BYTE m_Bytes[10]{};
-    void* m_oFuncAddy = nullptr;
-    size_t m_iLength = 0;
-private:
-    void* Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
-    void* Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
-public:
-    bool Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
-    bool Unhook();
-    CHook(void* pOriginalFunctionAddress, size_t iLength);
-};
-
 class CPatternScan
 {
 private:
@@ -73,4 +56,20 @@ public:
 
     MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
 
+};
+
+class CHook : public CMemory
+{
+private:
+    BYTE m_Bytes[0x100]{ 0 };
+    void* m_oFuncAddy = nullptr;
+    size_t m_iLength = 0;
+private:
+    // pOriginalFunction should be the & address of the original function we set our gateway to
+    void* Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
+    // pOriginalFunction should be the & address of the original function we set our gateway to
+    void* Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
+public:
+    bool Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
+    bool Unhook();
 };

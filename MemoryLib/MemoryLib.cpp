@@ -70,16 +70,17 @@ void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
     // place our jmp at our hook function
     memcpy(&pHookStart, &absJumpInstructions, sizeof(absJumpInstructions));
 
-    VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProc);
+    VirtualProtect(reinterpret_cast<LPVOID>(pHookStart), iLength, PAGE_EXECUTE_READWRITE, &oldProc);
 
     void* pTrampoline = VirtualAlloc(0, iLength + sizeof(absJumpInstructions), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
-    DWORD64 retto = (DWORD64)pHookStart + iLength;
+    DWORD64 retto = reinterpret_cast<DWORD64>(pHookStart) + iLength;
 
     // trampoline
     memcpy(absJumpInstructions + 6, &retto, 8);
-    memcpy((void*)((DWORD_PTR)pTrampoline), &pHookStart, iLength);
-    memcpy((void*)((DWORD_PTR)pTrampoline + iLength), absJumpInstructions, sizeof(absJumpInstructions));
+    // Ensure pointer arithmetic is done correctly, cast it to void*
+    memcpy(reinterpret_cast<void*>(reinterpret_cast<DWORD_PTR>(pTrampoline)), &pHookStart, iLength);
+    memcpy(reinterpret_cast<void*>(reinterpret_cast<DWORD_PTR>(pTrampoline) + iLength), absJumpInstructions, sizeof(absJumpInstructions));
 
     // orig
     memcpy(absJumpInstructions + 6, &pOurFunction, 8);
@@ -88,17 +89,22 @@ void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
     // Nop JMP at our Hook Function
     for (int i = 13; i < iLength; i++)
     {
-        *(BYTE*)((DWORD_PTR)pHookStart + i) = 0x90;
+        *reinterpret_cast<BYTE*>(reinterpret_cast<DWORD_PTR>(pHookStart) + i) = 0x90;
     }
 
     VirtualProtect(&pHookStart, iLength, oldProc, &oldProc);
-    return (void*)((DWORD_PTR)pTrampoline);
+    return reinterpret_cast<void*>(reinterpret_cast<DWORD_PTR>(pTrampoline));
 }
 
 bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength)
 {
     if (!pOriginalFunctionAddress)
         return false;
+
+    this->m_oFuncAddy = pOriginalFunctionAddress;
+    this->m_iLength = iLength;
+
+    this->InPatch(this->m_Bytes, this->m_oFuncAddy, this->m_iLength);
 
     // Create a copy of the functionPointer
     void** pBuffer = (void**)pOriginalFunction;
@@ -118,17 +124,9 @@ bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, ui
 
 bool CHook::Unhook()
 {
-    memcpy(this->m_oFuncAddy, this->m_Bytes, this->m_iLength);
+    this->InPatch(this->m_oFuncAddy, this->m_Bytes, this->m_iLength);
 
     return true;
-}
-
-CHook::CHook(void* pOriginalFunctionAddress, size_t iLength)
-{
-    this->m_oFuncAddy = pOriginalFunctionAddress;
-    this->m_iLength = iLength;
-
-    memcpy(this->m_Bytes, this->m_oFuncAddy, this->m_iLength);
 }
 
 char* CPatternScan::ScanInWrapper(char* pattern, char* mask, char* begin, size_t size)
