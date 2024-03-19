@@ -1,7 +1,11 @@
 #pragma once
 
-#include "pch.h"
-#include "framework.h"
+#include <Windows.h>
+
+#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+
+#include <TlHelp32.h>
+#include <string>
 #include "ntdll.h"
 
 class CPatternScan

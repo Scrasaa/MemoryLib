@@ -1,10 +1,6 @@
-// MemoryLib.cpp : Defines the functions for the static library.
-//
 #pragma warning ( disable : 6387 )
 #pragma warning ( disable : 4244 )
 
-#include "pch.h"
-#include "framework.h"
 #include "ntdll.h"
 #include "MemoryLib.h"
 
@@ -74,7 +70,7 @@ void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
 
     void* pTrampoline = VirtualAlloc(0, iLength + sizeof(absJumpInstructions), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
-    DWORD64 retto = reinterpret_cast<DWORD64>(pHookStart) + iLength;
+    DWORD64 retto = static_cast<DWORD64>(pHookStart) + iLength;
 
     // trampoline
     memcpy(absJumpInstructions + 6, &retto, 8);
@@ -89,7 +85,7 @@ void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
     // Nop JMP at our Hook Function
     for (int i = 13; i < iLength; i++)
     {
-        *reinterpret_cast<BYTE*>(reinterpret_cast<DWORD_PTR>(pHookStart) + i) = 0x90;
+        *reinterpret_cast<BYTE*>(static_cast<DWORD_PTR>(pHookStart) + i) = 0x90;
     }
 
     VirtualProtect(&pHookStart, iLength, oldProc, &oldProc);
@@ -487,7 +483,7 @@ HANDLE CMemory::GetProcess(uintptr_t procID)
 
 __forceinline uintptr_t CMemory::GetVirtualFunctionAdd(uintptr_t pVTable, size_t iOffset)
 {
-    return *(uintptr_t*)(*(uintptr_t*)pVTable + iOffset);
+    return *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(pVTable) + iOffset);
 }
 
 // function pointer (thiscall)
@@ -495,8 +491,9 @@ __forceinline uintptr_t CMemory::GetVirtualFunctionAdd(uintptr_t pVTable, size_t
 typedef void(__thiscall* OrgFunc)(LPVOID)
 return GetVirtualFunction<OrgFunc>(base, index)(Params);
 */
+
 template< typename Fn >
 __forceinline Fn CMemory::GetVirtualFunction(const void* base, size_t iIndex, size_t iOffset)
 {
-        return reinterpret_cast<Fn>(*reinterpret_cast<const void***>((size_t)base + offset));
+        return reinterpret_cast<Fn>(*reinterpret_cast<const void***>(reinterpret_cast<size_t>(base) + iOffset));
 }
