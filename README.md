@@ -9,8 +9,7 @@ MemoryLib is a comprehensive library designed for memory manipulation and patter
  - [CPatternScan](#cpatternscan)
  - [CMemory](#cmemory)
  - [CHook](#chook)
-- [Contributing](#contributing)
-- [License](#license)
+- [Acknowledgements](#acknowledgements)
 
 ## Getting Started
 
