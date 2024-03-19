@@ -119,4 +119,4 @@ To use MemoryLib, you need to have a C++ development environment set up. This li
    ## Acknowledgements
 
 I would like to express my heartfelt gratitude to the following community for their invaluable contributions, support and allowance to use their code:
-- ** GuidedHacking.com **: Without the support and collaboration of this incredible community, I wouldn't have been able to bring this together. Your contributions, insights, and feedback have been invaluable. Thank you for your time, expertise, and dedication.
+- **GuidedHacking.com**: Without the support and collaboration of this incredible community, I wouldn't have been able to bring this together. Your contributions, insights, and feedback have been invaluable. Thank you for your time, expertise, and dedication.
