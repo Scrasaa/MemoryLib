@@ -27,6 +27,7 @@ private:
 
 public:
     intptr_t InPatternScan(char* combopattern, std::string szModName);
+    intptr_t InPatternScan(char* szPattern, char* szMask, std::string szModName);
     intptr_t ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess);
 };
 

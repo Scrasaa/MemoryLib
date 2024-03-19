@@ -328,6 +328,16 @@ intptr_t CPatternScan::InPatternScan(char* combopattern, std::string szModName)
     return (intptr_t)match;
 }
 
+intptr_t CPatternScan::InPatternScan(char* szPattern, char* szMask, std::string szModName)
+{
+    // Getting the struc module informations of our module
+    LDR_DATA_TABLE_ENTRY* ldr = GetLDREntry(szModName);
+
+    char* match = ScanInWrapper(szPattern, szMask, (char*)ldr->DllBase, ldr->SizeOfImage);
+
+    return (intptr_t)match;
+}
+
 uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName, uintptr_t procID)
 {
     uintptr_t moduleBaseAddress = NULL;
