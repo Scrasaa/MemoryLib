@@ -16,32 +16,39 @@ void* CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
         return nullptr;
 
     // Allocate gateway
-    BYTE* pGateway = (BYTE*)VirtualAlloc(0, iLength, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
+    void* pGateway = VirtualAlloc(0, iLength + 5, MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
 
-    // Write Stolen Bytes to gatewa<y
-    memcpy_s(pGateway, iLength, (LPVOID)pHookStart, iLength);
+    if (!pGateway)
+        return nullptr;
 
-    uintptr_t gatewayRelativeAdd = pHookStart - (uintptr_t)pGateway - 5;
+    // Write Stolen Bytes to gateway
+    memcpy_s(pGateway, iLength, reinterpret_cast<void*>(pHookStart), iLength);
+
+    uintptr_t gatewayRelativeAdd = (pHookStart - reinterpret_cast<uintptr_t>(pGateway)) - 5;
 
     // JMP instrc at the end of gateway
-    *(pGateway + iLength) = 0xE9;
+    *reinterpret_cast<char*>((reinterpret_cast<uintptr_t>(pGateway) + iLength)) = 0xE9;
 
     // Write add of the gateway to the jump
-    *(uintptr_t*)((uintptr_t)pGateway + iLength + 1) = gatewayRelativeAdd;
+    *reinterpret_cast<uintptr_t*>((reinterpret_cast<uintptr_t>(pGateway) + iLength + 1)) = gatewayRelativeAdd;
 
-    // Detour
+    // Detour begins here
     DWORD oldProtect{};
 
     VirtualProtect((LPVOID)pHookStart, iLength, PAGE_EXECUTE_READWRITE, &oldProtect);
 
     uintptr_t relativeAddress = (pOurFunction - pHookStart) - 5;
 
-    *(uintptr_t*)pHookStart = 0xE9; // JMP opcode /0xE9
+    *reinterpret_cast<char*>(pHookStart) = 0xE9; // JMP opcode /0xE9
 
-    *(uintptr_t*)(pHookStart + 1) = relativeAddress;
+    *reinterpret_cast<uintptr_t*>(pHookStart + 1) = relativeAddress;
 
-    VirtualProtect((LPVOID)pHookStart, iLength, oldProtect, 0);
-
+    if (!VirtualProtect((LPVOID)pHookStart, iLength, oldProtect, &oldProtect))
+    {
+        // Handle protection restoration error
+        VirtualFree(pGateway, 0, MEM_RELEASE);
+        return nullptr;
+    }
     return pGateway;
 }
 
