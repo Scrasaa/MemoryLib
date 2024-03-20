@@ -72,8 +72,6 @@ private:
 private:
     // pOriginalFunction should be the & address of the original function we set our gateway to
     void* Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
-    // pOriginalFunction should be the & address of the original function we set our gateway to
-    void* Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength);
 public:
     bool Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
     bool Unhook();

@@ -48,50 +48,6 @@ void* CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
     return pGateway;
 }
 
-void* CHook::Detour64(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLength)
-{
-    if (iLength < 13)
-        return nullptr;
-
-    uint8_t absJumpInstructions[] =
-    {
-      0x49, 0xBA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, //mov r10, addr
-      0x41, 0xFF, 0xE2 //jmp r10
-    };
-
-    DWORD oldProc{};
-
-    // copy function address into mov r10, address
-    memcpy(&absJumpInstructions[2], &pOurFunction, sizeof(pOurFunction));
-    // place our jmp at our hook function
-    memcpy(&pHookStart, &absJumpInstructions, sizeof(absJumpInstructions));
-
-    VirtualProtect(reinterpret_cast<LPVOID>(pHookStart), iLength, PAGE_EXECUTE_READWRITE, &oldProc);
-
-    void* pTrampoline = VirtualAlloc(0, iLength + sizeof(absJumpInstructions), MEM_COMMIT | MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-
-    DWORD64 retto = static_cast<DWORD64>(pHookStart) + iLength;
-
-    // trampoline
-    memcpy(absJumpInstructions + 6, &retto, 8);
-    // Ensure pointer arithmetic is done correctly, cast it to void*
-    memcpy(reinterpret_cast<void*>(reinterpret_cast<DWORD_PTR>(pTrampoline)), &pHookStart, iLength);
-    memcpy(reinterpret_cast<void*>(reinterpret_cast<DWORD_PTR>(pTrampoline) + iLength), absJumpInstructions, sizeof(absJumpInstructions));
-
-    // orig
-    memcpy(absJumpInstructions + 6, &pOurFunction, 8);
-    memcpy(&pHookStart, absJumpInstructions, sizeof(absJumpInstructions));
-
-    // Nop JMP at our Hook Function
-    for (int i = 13; i < iLength; i++)
-    {
-        *reinterpret_cast<BYTE*>(static_cast<DWORD_PTR>(pHookStart) + i) = 0x90;
-    }
-
-    VirtualProtect(&pHookStart, iLength, oldProc, &oldProc);
-    return reinterpret_cast<void*>(reinterpret_cast<DWORD_PTR>(pTrampoline));
-}
-
 bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength)
 {
     if (!pOriginalFunctionAddress)
@@ -109,11 +65,7 @@ bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, ui
     *pBuffer = (void**)pOriginalFunctionAddress;
 
     // Make the function pointer point to our gateway
-    #ifdef _WIN64
-        *pBuffer = (void*)(Detour64((uintptr_t)*pBuffer, ourFunction, iLength));
-    #else 
         *pBuffer = (void*)(Detour32((uintptr_t)*pBuffer, ourFunction, iLength));
-    #endif
 
     return true;
 }
