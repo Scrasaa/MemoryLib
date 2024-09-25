@@ -54,12 +54,21 @@ public:
 
     HANDLE GetProcess(uintptr_t procID);
 
-    __forceinline uintptr_t GetVirtualFunctionAdd(uintptr_t pVTable, size_t iOffset);
-
-    template< typename Fn >
-    __forceinline Fn GetVirtualFunction(const void* base, size_t iIndex, size_t iOffset);
-
     MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
+
+    DWORD GetHashFromString(char* szString) const;
+
+    PDWORD GetFunctionAddressByHash(char* library, DWORD hash) const;
+
+    void* GetFunctionAddress(char* MyNtdllFunction, PVOID MyDLLBaseAddress) const;
+
+    template<typename T>
+    T GetVTableFunction(void* pBase, int iIndex);
+
+    static inline uintptr_t GetVirtual(void*** c, int idx)
+    {
+        return reinterpret_cast<uintptr_t>((*c)[idx]);
+    }
 
 };
 
