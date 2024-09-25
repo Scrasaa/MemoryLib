@@ -45,12 +45,13 @@ void* CHook::Detour32(uintptr_t pHookStart, uintptr_t pOurFunction, size_t iLeng
         VirtualFree(pGateway, 0, MEM_RELEASE);
         return nullptr;
     }
+
     return pGateway;
 }
 
 bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength)
 {
-    if (!pOriginalFunctionAddress)
+      if (!pOriginalFunctionAddress || !pOriginalFunction)
         return false;
 
     this->m_oFuncAddy = pOriginalFunctionAddress;
@@ -58,14 +59,12 @@ bool CHook::Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, ui
 
     this->InPatch(this->m_Bytes, this->m_oFuncAddy, this->m_iLength);
 
-    // Create a copy of the functionPointer
-    void** pBuffer = (void**)pOriginalFunction;
+    auto pDetour = reinterpret_cast<uintptr_t>(Detour32(reinterpret_cast<uintptr_t>(pOriginalFunctionAddress), ourFunction, iLength));
 
-    // Make the function pointer point to the original function address
-    *pBuffer = (void**)pOriginalFunctionAddress;
+    if (!pDetour)
+        return false;
 
-    // Make the function pointer point to our gateway
-        *pBuffer = (void*)(Detour32((uintptr_t)*pBuffer, ourFunction, iLength));
+    *reinterpret_cast<uintptr_t*>(pOriginalFunction) = pDetour;
 
     return true;
 }
@@ -443,19 +442,99 @@ HANDLE CMemory::GetProcess(uintptr_t procID)
     return hProcess;
 }
 
-__forceinline uintptr_t CMemory::GetVirtualFunctionAdd(uintptr_t pVTable, size_t iOffset)
+DWORD CMemory::GetHashFromString(char* szString) const
 {
-    return *reinterpret_cast<uintptr_t*>(*reinterpret_cast<uintptr_t*>(pVTable) + iOffset);
+    size_t iLength = strnlen_s(szString, 50);
+    DWORD hash = 0x35;
+
+    for (size_t i = 0; i < iLength; i++)
+    {
+        hash += (hash * 0xab10f29f + szString[i]) & 0xffffff;
+    }
+
+    return hash;
 }
 
-// function pointer (thiscall)
-/*
-typedef void(__thiscall* OrgFunc)(LPVOID)
-return GetVirtualFunction<OrgFunc>(base, index)(Params);
-*/
-
-template< typename Fn >
-__forceinline Fn CMemory::GetVirtualFunction(const void* base, size_t iIndex, size_t iOffset)
+PDWORD CMemory::GetFunctionAddressByHash(char* library, DWORD hash) const
 {
-        return reinterpret_cast<Fn>(*reinterpret_cast<const void***>(reinterpret_cast<size_t>(base) + iOffset));
+    PDWORD functionAddress = nullptr;
+
+    // Get base address of the module in which our exported function of interest resides (kernel32 in the case of CreateThread)
+    HMODULE libraryBase = LoadLibraryA(library);
+
+    auto dosHeader = (PIMAGE_DOS_HEADER)libraryBase;
+    auto imageNTHeaders = (PIMAGE_NT_HEADERS)((DWORD)libraryBase + dosHeader->e_lfanew);
+
+    DWORD exportDirectoryRVA = imageNTHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress;
+
+    auto imageExportDirectory = (PIMAGE_EXPORT_DIRECTORY)((DWORD)libraryBase + exportDirectoryRVA);
+
+    // Get RVAs to exported function related information
+    auto addresOfFunctionsRVA = (PDWORD)((DWORD)libraryBase + imageExportDirectory->AddressOfFunctions);
+    auto addressOfNamesRVA = (PDWORD)((DWORD)libraryBase + imageExportDirectory->AddressOfNames);
+    auto addressOfNameOrdinalsRVA = (PWORD)((DWORD)libraryBase + imageExportDirectory->AddressOfNameOrdinals);
+
+    // Iterate through exported functions, calculate their hashes and check if any of them match our hash of 0x00544e304 (CreateThread)
+    // If yes, get its virtual memory address (this is where CreateThread function resides in memory of our process)
+    for (DWORD i = 0; i < imageExportDirectory->NumberOfFunctions; i++)
+    {
+        DWORD functionNameRVA = addressOfNamesRVA[i];
+        DWORD functionNameVA = (DWORD)libraryBase + functionNameRVA;
+        auto* functionName = (char*)functionNameVA;
+        DWORD functionAddressRVA = 0;
+
+        // Calculate hash for this exported function
+        DWORD functionNameHash = GetHashFromString(functionName);
+
+        // If hash for CreateThread is found, resolve the function address
+        if (functionNameHash == hash)
+        {
+            functionAddressRVA = addresOfFunctionsRVA[addressOfNameOrdinalsRVA[i]];
+            functionAddress = (PDWORD)((DWORD)libraryBase + functionAddressRVA);
+            //printf("%s : 0x%x : %p\n", functionName, functionNameHash, functionAddress);
+            return functionAddress;
+        }
+    }
+}
+
+void* CMemory::GetFunctionAddress(char* MyNtdllFunction, PVOID MyDLLBaseAddress) const
+{
+    DWORD j;
+    uintptr_t RVA = 0;
+
+    //Parse DLL loaded in memory
+    const auto BaseDLLAddr = (LPVOID)MyDLLBaseAddress;
+    auto pImgDOSHead = (PIMAGE_DOS_HEADER)BaseDLLAddr;
+    auto pImgNTHead = (PIMAGE_NT_HEADERS)((DWORD_PTR)BaseDLLAddr + pImgDOSHead->e_lfanew);
+
+    //Get the Export Directory Structure
+    auto pImgExpDir = (PIMAGE_EXPORT_DIRECTORY)((LPBYTE)BaseDLLAddr + pImgNTHead->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+
+    //Get the functions RVA array
+    auto Address = (PDWORD)((LPBYTE)BaseDLLAddr + pImgExpDir->AddressOfFunctions);
+
+    //Get the function names array 
+    auto Name = (PDWORD)((LPBYTE)BaseDLLAddr + pImgExpDir->AddressOfNames);
+
+    //get the Ordinal array
+    auto Ordinal = (PWORD)((LPBYTE)BaseDLLAddr + pImgExpDir->AddressOfNameOrdinals);
+
+    //Get RVA of the function from the export table
+    for (j = 0; j < pImgExpDir->NumberOfNames; j++) {
+        if (!strcmp(MyNtdllFunction, (char*)BaseDLLAddr + Name[j])) {
+            //if function name found, we retrieve the RVA
+            RVA = (uintptr_t)((LPBYTE)Address[Ordinal[j]]);
+            break;
+        }
+    }
+
+    if (RVA) {
+        //Compute RVA to find the current address in the process
+        uintptr_t moduleBase = (uintptr_t)BaseDLLAddr;
+        uintptr_t* TrueAddress = (uintptr_t*)(moduleBase + RVA);
+        return (PVOID)TrueAddress;
+    }
+    else {
+        return (PVOID)RVA;
+    }
 }
