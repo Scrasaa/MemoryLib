@@ -6,6 +6,7 @@
 
 #include <TlHelp32.h>
 #include <string>
+#include <exception>
 #include "ntdll.h"
 
 class CPatternScan
@@ -85,3 +86,14 @@ public:
     bool Hook(void* pOriginalFunctionAddress, uintptr_t pOriginalFunction, uintptr_t ourFunction, size_t iLength);
     bool Unhook();
 };
+
+class OffsetUpdateException : public std::exception {
+public:
+    explicit OffsetUpdateException(const std::string& message) : msg_(message) {}
+    const char* what() const noexcept override {
+        return msg_.c_str();
+    }
+private:
+    std::string msg_;
+};
+
