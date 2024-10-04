@@ -659,3 +659,23 @@ void* CMemory::GetFunctionAddress(char* MyNtdllFunction, PVOID MyDLLBaseAddress)
 		return (PVOID)RVA;
 	}
 }
+
+bool IsPointerReadable(void* ptr)
+{
+	if (ptr == nullptr)
+		return false;
+
+	MEMORY_BASIC_INFORMATION mbi;
+	SIZE_T result = VirtualQuery(ptr, &mbi, sizeof(mbi));
+
+	if (result == 0)
+		return false;
+
+	if (!(mbi.State & MEM_COMMIT))
+		return false;
+
+	if (mbi.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE))
+		return true;
+
+	return false;
+}
