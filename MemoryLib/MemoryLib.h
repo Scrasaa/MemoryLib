@@ -106,3 +106,5 @@ public:
 private:
 	std::string msg_;
 };
+
+bool IsPointerReadable(void* ptr);
