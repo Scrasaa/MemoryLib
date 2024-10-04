@@ -78,6 +78,11 @@ public:
 	intptr_t ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess);
 };
 
+// Lighter alternative to CPatternScan method
+std::vector<int> ConvertPatternToBytes(const std::string& szPattern);
+uint8_t* ScanPattern(const std::string& szSignature);
+
+
 class CHook : public CMemory
 {
 private:
