@@ -214,19 +214,6 @@ char* CPatternScan::TO_CHAR(wchar_t* string)
     return c_string;
 }
 
-// Structure with ProcessInformation
-PEB* CPatternScan::GetPEB()
-{
-#ifdef _WIN64
-    PEB* peb = (PEB*)__readgsword(0x60);
-
-#else
-    PEB* peb = (PEB*)__readfsdword(0x30);
-#endif
-
-    return peb;
-}
-
 LDR_DATA_TABLE_ENTRY* CPatternScan::GetLDREntry(std::string name)
 {
     // Contains information about the loaded modules for the process
@@ -287,6 +274,55 @@ intptr_t CPatternScan::InPatternScan(char* szPattern, char* szMask, std::string 
     char* match = ScanInWrapper(szPattern, szMask, (char*)ldr->DllBase, ldr->SizeOfImage);
 
     return (intptr_t)match;
+}
+
+PEB* CMemory::GetPEB() const
+{
+#ifdef _WIN64
+    auto peb = (PEB*)__readgsword(0x60);
+
+#else
+    auto peb = (PEB*)__readfsdword(0x30);
+#endif
+
+    return peb;
+}
+
+HMODULE CMemory::ResolveModuleBaseAddressPEB(char* szModuleName) const
+{
+    // Convert the input module name to LPCWSTR
+    LPCWSTR lModuleName = ConvertToLPCWSTR(szModuleName);
+    if (!lModuleName)
+        return nullptr;
+    // move getpeb to cmemory and use it instead
+    // Access the PEB structure
+    auto pPeb = GetPEB();
+
+    PEB_LDR_DATA* pLdr = pPeb->Ldr;
+    LIST_ENTRY* pListHead = &pLdr->InMemoryOrderModuleList;
+    LIST_ENTRY* pCurrent = pListHead->Flink;
+
+    // Iterate through the loaded modules
+    while (pCurrent != pListHead) {
+        // Get the current LDR_DATA_TABLE_ENTRY
+        auto pEntry = CONTAINING_RECORD(pCurrent, LDR_DATA_TABLE_ENTRY, InMemoryOrderLinks);
+
+        // Compare the module names safely
+        if (pEntry->BaseDllName.Buffer != NULL) {
+            if (_wcsicmp(pEntry->BaseDllName.Buffer, lModuleName) == 0) {
+                // Found the DLL, return its base address
+                delete[] lModuleName; // Clean up
+                return (HMODULE)pEntry->DllBase; // Return the base address
+            }
+        }
+
+        // Move to the next entry
+        pCurrent = pCurrent->Flink;
+    }
+
+    // Clean up if not found
+    delete[] lModuleName; // Clean up
+    return nullptr;
 }
 
 uintptr_t CMemory::GetModuleBaseAddress(const char* szModuleName, uintptr_t procID)
