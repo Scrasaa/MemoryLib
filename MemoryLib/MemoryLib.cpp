@@ -274,6 +274,61 @@ intptr_t CPatternScan::InPatternScan(char* szPattern, char* szMask, std::string 
 	return (intptr_t)match;
 }
 
+std::vector<int> ConvertPatternToBytes(const std::string& szPattern) {
+    std::vector<int> bytes;
+    const char* start = szPattern.c_str();
+    const char* end = start + szPattern.length();
+
+    for (const char* current = start; current < end; ++current) {
+        if (*current == '?') {
+            ++current;
+            if (*current == '?')
+                ++current;
+            bytes.push_back(-1); // Wildcard
+        }
+        else {
+            bytes.push_back(static_cast<int>(std::strtoul(current, const_cast<char**>(&current), 16)));
+        }
+    }
+
+    return bytes;
+}
+
+uint8_t* ScanPattern(const std::string& szSignature) {
+
+    HMODULE moduleHandle = GetModuleHandleA(nullptr);
+    if (!moduleHandle)
+        return nullptr;
+
+    auto const* dosHeader = reinterpret_cast<PIMAGE_DOS_HEADER>(moduleHandle);
+    auto const* ntHeaders = reinterpret_cast<PIMAGE_NT_HEADERS>(
+        reinterpret_cast<uint8_t*>(moduleHandle) + dosHeader->e_lfanew
+        );
+
+    const size_t moduleSize = ntHeaders->OptionalHeader.SizeOfImage;
+    auto* moduleBytes = reinterpret_cast<uint8_t*>(moduleHandle);
+
+    // Convert the pattern into byte format.
+    std::vector<int> patternBytes = ConvertPatternToBytes(szSignature);
+    const size_t patternLength = patternBytes.size();
+
+    // Scan the module's memory for the pattern.
+    for (size_t i = 0; i < moduleSize - patternLength; ++i) {
+        bool matchFound = true;
+
+        // Compare memory bytes to the pattern.
+        for (size_t j = 0; j < patternLength; ++j) {
+            if (moduleBytes[i + j] != patternBytes[j] && patternBytes[j] != -1) {
+                matchFound = false;
+                break;
+            }
+        }
+        if (matchFound)
+            return &moduleBytes[i];
+    }
+    return nullptr;
+}
+
 LPCWSTR CMemory::ConvertToLPCWSTR(const char* szModuleName) const
 {
 	if (!szModuleName)
@@ -309,7 +364,7 @@ int CMemory::CmpUnicodeStr(const WCHAR* substr, const WCHAR* mystr)
 	return (wcsstr(lowerMystr, lowerSubstr) != NULL) ? 1 : 0;
 }
 
-PEB* CMemory::GetPEB() const
+PEB* CMemory::GetPEB()
 {
 #ifdef _WIN64
 	auto peb = (PEB*)__readgsword(0x60);
