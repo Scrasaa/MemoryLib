@@ -20,6 +20,8 @@ private:
 protected:
     PEB* GetPEB() const;
 public:
+    HMODULE ResolveModuleBaseAddressPEB(char* szModuleName) const;
+
     uintptr_t GetModuleBaseAddress(const char* szModuleName, uintptr_t procID);
 
     uintptr_t GetProcessID(const char* szProcessName);
