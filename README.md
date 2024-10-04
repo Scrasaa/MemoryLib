@@ -4,8 +4,6 @@ MemoryLib is a comprehensive collection of functions designed for memory manipul
 
 ## Table of Contents
 
-- [Getting Started](#getting-started)
-- [Usage](#usage)
  - [CPatternScan](#cpatternscan)
  - [CMemory](#cmemory)
  - [CHook](#chook)
