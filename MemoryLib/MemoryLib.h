@@ -17,9 +17,9 @@ private:
 	LPCWSTR ConvertToLPCWSTR(const char* szModuleName) const;
 
 	int CmpUnicodeStr(const WCHAR* substr, const WCHAR* mystr);
-protected:
-	PEB* GetPEB() const;
 public:
+	PEB* GetPEB();
+
 	HMODULE ResolveModuleBaseAddressPEB(char* szModuleName) const;
 
 	uintptr_t GetModuleBaseAddress(const char* szModuleName, uintptr_t procID);
@@ -57,7 +57,7 @@ public:
 	}
 };
 
-class CPatternScan : protected CMemory
+class CPatternScan : public CMemory
 {
 private:
 	char* ScanInWrapper(char* pattern, char* mask, char* begin, size_t size);
