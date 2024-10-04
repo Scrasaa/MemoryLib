@@ -9,31 +9,16 @@
 #include <exception>
 #include "ntdll.h"
 
-class CPatternScan
-{
-private:
-    char* ScanInWrapper(char* pattern, char* mask, char* begin, size_t size);
-
-    void Parse(char* combo, char* pattern, char* mask);
-
-    char* PatternScan(char* pattern, char* mask, char* begin, size_t size);
-
-    char* TO_CHAR(wchar_t* string);
-
-    PEB* GetPEB();
-
-    LDR_DATA_TABLE_ENTRY* GetLDREntry(std::string name);
-
-    char* ScanExWrapper(char* pattern, char* mask, char* begin, char* end, HANDLE hProc);
-
-public:
-    intptr_t InPatternScan(char* combopattern, std::string szModName);
-    intptr_t InPatternScan(char* szPattern, char* szMask, std::string szModName);
-    intptr_t ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess);
-};
-
 class CMemory
 {
+private:
+    DWORD GetHashFromString(char* szString) const;
+
+    LPCWSTR ConvertToLPCWSTR(const char* szModuleName) const;
+
+    int CmpUnicodeStr(const WCHAR* substr, const WCHAR* mystr);
+protected:
+    PEB* GetPEB() const;
 public:
     uintptr_t GetModuleBaseAddress(const char* szModuleName, uintptr_t procID);
 
@@ -56,9 +41,7 @@ public:
     HANDLE GetProcess(uintptr_t procID);
 
     MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
-
-    DWORD GetHashFromString(char* szString) const;
-
+    
     PDWORD GetFunctionAddressByHash(char* library, DWORD hash) const;
 
     void* GetFunctionAddress(char* MyNtdllFunction, PVOID MyDLLBaseAddress) const;
@@ -71,6 +54,27 @@ public:
         return reinterpret_cast<uintptr_t>((*c)[idx]);
     }
 
+};
+
+class CPatternScan : protected CMemory
+{
+private:
+    char* ScanInWrapper(char* pattern, char* mask, char* begin, size_t size);
+
+    void Parse(char* combo, char* pattern, char* mask);
+
+    char* PatternScan(char* pattern, char* mask, char* begin, size_t size);
+
+    char* TO_CHAR(wchar_t* string);
+
+    LDR_DATA_TABLE_ENTRY* GetLDREntry(std::string name);
+
+    char* ScanExWrapper(char* pattern, char* mask, char* begin, char* end, HANDLE hProc);
+
+public:
+    intptr_t InPatternScan(char* combopattern, std::string szModName);
+    intptr_t InPatternScan(char* szPattern, char* szMask, std::string szModName);
+    intptr_t ExPatternScan(char* combopattern, std::string szModName, uintptr_t procID, HANDLE hProcess);
 };
 
 class CHook : public CMemory
