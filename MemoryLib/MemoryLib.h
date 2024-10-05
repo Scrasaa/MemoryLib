@@ -44,7 +44,7 @@ public:
 
 	MODULEENTRY32 GetModuleEntry(const char* szModuleName, uintptr_t procID);
 
-	PDWORD GetFunctionAddressByHash(char* library, DWORD hash) const;
+	PDWORD GetFunctionAddressByHash(char* library, DWORD hash);
 
 	void* GetFunctionAddress(char* MyNtdllFunction, PVOID MyDLLBaseAddress) const;
 
