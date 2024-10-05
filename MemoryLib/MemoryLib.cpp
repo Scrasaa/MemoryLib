@@ -576,7 +576,7 @@ DWORD CMemory::GetHashFromString(char* szString) const
 	return hash;
 }
 
-PDWORD CMemory::GetFunctionAddressByHash(char* library, DWORD hash) const
+PDWORD CMemory::GetFunctionAddressByHash(char* library, DWORD hash)
 {
 	PDWORD functionAddress = nullptr;
 
